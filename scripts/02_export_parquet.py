@@ -2,7 +2,8 @@
 
 The twelve files have different columns (a field name of a Shapefile is cut at ten characters, and the
 fields change from year to year), so each is its own table, named h26 to h30 and r1 to r7. Every
-column of the source is kept under its own name, as the source has it: text as text (empty is null,
+column of the source, except the name of the municipal staff member who entered the record (入力者氏名
+or 入力者担当; the raw files keep it), is kept under its own name, as the source has it: text as text (empty is null,
 digits stay full-width where the source has them), numbers as integers. Added: `row` (the position in
 the file), `geometry` (WKB Point, longitude and latitude; see the card for the datum) and, for R2 to R7,
 `source_x`, `source_y` (the plane rectangular coordinates of the Shapefile, metres).
@@ -35,6 +36,8 @@ def table_of(name: str, data: bytes) -> pa.Table:
     table = k.FILES[name][0]
     cols = {"row": pa.array(range(1, len(body) + 1), type=pa.int32())}
     for j, h in enumerate(head):
+        if h in k.STAFF_COLUMNS:
+            continue
         cols[h] = column([r[j] for r in body])
     if table in k.PLANE_TABLES:
         cols["source_x"] = pa.array([p[0] for p in pts], type=pa.float64())
@@ -53,7 +56,7 @@ def main() -> int:
     raw = runs[-1].parent if args.version is None else ROOT / "data" / "raw" / args.version
     out = ROOT / "data" / "parquet"
     out.mkdir(parents=True, exist_ok=True)
-    counts, columns = {}, {}
+    counts, columns, dropped = {}, {}, {}
     for name, (table, _, _) in k.FILES.items():
         t = table_of(name, (raw / name).read_bytes())
         pq.write_table(t, out / f"{table}.parquet", compression="zstd")
@@ -61,9 +64,12 @@ def main() -> int:
         columns[table] = [
             f for f in t.schema.names if f not in ("row", "geometry", "source_x", "source_y")
         ]
+        dropped[table] = [
+            h for h in k.layer(name, (raw / name).read_bytes())[0] if h in k.STAFF_COLUMNS
+        ]
         print(table, t.num_rows)
     (out / "columns.json").write_text(
-        json.dumps({"run": raw.name, "counts": counts, "source_columns": columns,
+        json.dumps({"run": raw.name, "counts": counts, "source_columns": columns, "dropped_columns": dropped,
                     "files": {t: n for n, (t, _, _) in k.FILES.items()}}, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8")  # fmt: skip
     return 0

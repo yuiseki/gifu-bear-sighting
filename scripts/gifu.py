@@ -35,6 +35,8 @@ MUNICIPALITY_FIELD = {
     "r7": "市町村名",
 }
 BBOX = (136.1, 35.0, 137.9, 36.6)  # lon min, lat min, lon max, lat max: Gifu with a margin
+# columns that hold the name of the municipal staff member who entered a record: in the raw files, not in the Parquet
+STAFF_COLUMNS = ("入力者氏名", "入力者担当")
 R1_LON, R1_LAT = "JGD2011_10進_X", "JGD2011_10進_Y"
 
 

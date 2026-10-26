@@ -108,8 +108,13 @@ def main() -> int:
         n = len(recs)
         assert len(d["row"]) == n == cols["counts"][table], (table, n)
         assert d["row"] == list(range(1, n + 1))
-        assert cols["source_columns"][table] == head, table
+        kept = [h for h in head if h not in k.STAFF_COLUMNS]
+        assert cols["source_columns"][table] == kept, table
+        assert cols["dropped_columns"][table] == [h for h in head if h in k.STAFF_COLUMNS], table
+        assert not set(d) & set(k.STAFF_COLUMNS), table
         for j, h in enumerate(head):
+            if h in k.STAFF_COLUMNS:
+                continue
             want = [r[j] for r in recs]
             assert d[h] == want, (table, h)
         for i in range(n):

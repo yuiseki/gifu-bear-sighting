@@ -60,8 +60,8 @@ The twelve files do not share their columns: the names of the Shapefile fields a
 characters by the format (for example `出没時間（`, `出没市町2`), and the fields change from year to year
 (R1 to R7 have, among others, the month, the day, the time, the municipality, the former municipality,
 the kind of place, the number of animals, the reporter, the cause predicted, the details, the mesh
-number of the prefecture's grid). Every table keeps all columns of its file under the name the
-source gives, as written: text as text (empty is null; digits and letters stay full-width where the
+number of the prefecture's grid). Every table keeps all columns of its file, except the staff name column described under known
+issues, under the name the source gives, as written: text as text (empty is null; digits and letters stay full-width where the
 source has them, e.g. `１１月`, `Ｃ-137`), numbers as integers. Added to every table: `row` (the position
 in the file) and `geometry` (the point as WKB, longitude and latitude). R2 to R7 also have `source_x`,
 `source_y`, the coordinates of the Shapefile.
@@ -87,11 +87,12 @@ column carries no crs in its metadata, which means the default, WGS84 (OGC:CRS84
 
 ## What was changed
 
-- Nothing in the attributes. Added `row`, `geometry` (and `source_x`, `source_y`), typed the dBASE
+- Nothing in the attributes, except that the column with the name of the municipal staff member who
+  entered a record was left out of the Parquet (see known issues). Added `row`, `geometry` (and `source_x`, `source_y`), typed the dBASE
   numeric fields as integers, made empty fields null, and projected the points of R2 to R7. The Parquet
   was checked against the source files with a second reader (the `.dbf` and the `.shp` parsed by hand,
   the CSV with its own reader), every row and column.
-- Nothing was removed, merged or corrected.
+- Nothing else was removed, merged or corrected.
 
 ## Known issues
 
@@ -123,19 +124,16 @@ def main() -> int:
         f"| `{t}` | {label} (FY{fy}) | `{n}` | {cols['counts'][t]:,} |"
         for n, (t, fy, label) in k.FILES.items()
     )
-    staff = sorted(
-        {
-            c
-            for t, cs in cols["source_columns"].items()
-            for c in cs
-            if c.startswith(("入力者氏名", "入力者担当"))
-        }
-    )
+    dropped = {t: c for t, c in cols["dropped_columns"].items() if c}
     staff_text = (
-        "Some tables have columns with the name of the municipal staff member who entered the record ("
-        + ", ".join(f"`{c}`" for c in staff)
-        + "). They are in the source as published, under the same licence, and are kept as they are; "
-        "downstream users may prefer to drop them."
+        "The source files of R1 to R7 have a column with the name of the municipal staff member who entered "
+        "each record ("
+        + ", ".join(sorted({c for cs in dropped.values() for c in cs}))
+        + "). It is not in the Parquet "
+        "tables ("
+        + ", ".join(sorted(dropped))
+        + "); the raw files under `raw/` are as the prefecture "
+        "published them and still have it."
     )
     ok = json.loads((ROOT / "data/docs/plane_check.json").read_text())
     card = CARD.format(
